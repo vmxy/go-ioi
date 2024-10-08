@@ -5,28 +5,30 @@ import (
 	"log"
 	"net"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/yamux"
+	"github.com/vmxy/go-ioi/ioi/util"
 )
 
 type Tcp struct {
-	Manager  *Manager[*yamux.Session]
 	chanConn chan net.Conn
 }
 
 var _ = (Accept)((*Tcp)(nil))
-var _ = (Connect)((*Tcp)(nil))
+
+//var _ = (Connect)((*Tcp)(nil))
 
 //var _ = (Connect)((*AcceptTcp)(nil))
 
 func NewTcp() *Tcp {
-	m := NewManager[*yamux.Session]()
 	q := &Tcp{
-		Manager:  &m,
 		chanConn: make(chan net.Conn, 1),
 	}
 	return q
 }
 func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
+	maps := util.NewMap[string, *Session]()
+	defer maps.Clear()
 	hp := fmt.Sprintf("%s:%d", host, port)
 	listener, err := net.Listen("tcp", hp)
 	if err != nil {
@@ -37,7 +39,6 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println(err)
 			continue
 		}
 		size, err := conn.Read(bs)
@@ -45,10 +46,10 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 			log.Println("read err", err)
 			continue
 		}
-		handshake := bs[0:size]
-		fmt.Println("read====", size, string(handshake))
-		if IsWebSocket(handshake) {
-			conn, err = UpdateWebSocket(handshake, &conn)
+		chunk := bs[0:size]
+		fmt.Println("read====", size, string(chunk))
+		if IsWebSocket(chunk) {
+			conn, err = UpdateWebSocket(chunk, &conn)
 			if err != nil {
 				log.Println("websocket accept error", err)
 				continue
@@ -58,89 +59,54 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 				log.Println("websocket read err", err)
 				continue
 			}
-			handshake = bs[0:size]
+			chunk = bs[0:size]
 		}
-		if !IsVMFS(handshake) {
+		if !IsVMFS(chunk) {
 			conn.Close()
 			continue
 		}
-		_, id := parseVMFSRequest(handshake)
-		fmt.Println("id==", id)
+		_, connectType, sid := parseVMFSRequest(chunk)
+		fmt.Println("id==", sid)
 		conn.Write([]byte("vmfs/1 200 ok\r\n\r\n"))
-		// Setup server side of yamux
-		sess, err := yamux.Server(conn, nil)
-		if err != nil {
-			log.Println(err)
-			continue
+		sess, find := maps.Get(sid)
+		if !find {
+			sess1 := NewSession[*yamux.Session](nil, nil)
+			sess = &sess1
+			maps.Set(sid, &sess1)
 		}
-		fmt.Println("xxxxx add mmmm ", sess.RemoteAddr().String())
-		go accept.handleSession(sess, handle)
-	}
-}
-
-/*
-	func (accept *Tcp) ConnectVirtual(id string) (net.Conn, error) {
-
-}
-*/
-func (accept *Tcp) handleSession(sess *yamux.Session, handle SessionHandle) {
-	key := sess.RemoteAddr().String()
-	fmt.Println("------------>key", key)
-	defer func() {
-		sess.Close()
-		accept.Manager.Delete(key)
-	}()
-	for {
-		stream, err := sess.AcceptStream()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		go handle(stream)
-	}
-}
-
-func (accept *Tcp) Connect(host string, port int) (net.Conn, error) {
-	hp := fmt.Sprintf("%s:%d", host, port)
-	var session *yamux.Session
-	if sess, ok := accept.Manager.Get(hp); ok {
-		if sess.IsClosed() {
-			accept.Manager.Delete(hp)
+		if connectType == "server" {
+			// Setup server side of yamux
+			client, err := yamux.Client(conn, nil)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			sess.clientSession = client
+			handle(sess)
 		} else {
-			session = sess
+			// Setup server side of yamux
+			server, err := yamux.Server(conn, nil)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			sess.serverSession = server
 		}
 	}
-	if session == nil {
-		conn, err := net.Dial("tcp", hp)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		err = connect(conn, "1")
-		fmt.Println("ddd", "tcp", hp, err)
+}
 
-		if err != nil {
-			conn.Close()
-			return nil, err
-		}
+func (accept *Tcp) Connect(host string, port int) (*Session, error) {
+	sid := uuid.New().String()
 
-		sess, err := yamux.Client(conn, nil)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		go accept.handleSession(sess, func(conn net.Conn) {
-			fmt.Println("==========>>>>>>>>>>>>>accept----")
-			accept.chanConn <- conn
-		})
-		session = sess
-		accept.Manager.Set(hp, session)
-	}
-	conn, err := session.Open() //OpenStream
+	hostport := fmt.Sprintf("%s:%d", host, port)
+	client, err := connectClient(hostport, sid)
 	if err != nil {
-		log.Println(err)
-		accept.Manager.Delete(hp)
 		return nil, err
 	}
-	return conn, nil
+	server, err := connectServer(hostport, sid)
+	if err != nil {
+		return nil, err
+	}
+	session := NewSession(client, server)
+	return &session, nil
 }

@@ -2,7 +2,7 @@ package stream
 
 import "net"
 
-type SessionHandle func(conn net.Conn)
+type SessionHandle func(session *Session[any])
 
 type Accept interface {
 	Listen(host string, port int, handle SessionHandle)

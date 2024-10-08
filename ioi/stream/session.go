@@ -8,14 +8,14 @@ import (
 	"github.com/quic-go/quic-go"
 )
 
-type Session[T any] struct {
-	clientSession T
-	serverSession T
+type Session struct {
+	clientSession any
+	serverSession any
 	chanClose     chan bool
 }
 
-func NewSession[T any](client T, server T) Session[T] {
-	session := Session[T]{
+func NewSession[T any](client T, server T) Session {
+	session := Session{
 		clientSession: client,
 		serverSession: server,
 		chanClose:     make(chan bool, 1),
@@ -23,9 +23,9 @@ func NewSession[T any](client T, server T) Session[T] {
 	return session
 }
 
-func (s *Session[T]) OpenStream() (conn net.Conn, err error) {
+func (s *Session) OpenStream() (conn net.Conn, err error) {
 	if sess, ok := any(s.clientSession).(*yamux.Session); ok {
-		conn, err = sess.OpenStream()
+		conn, err = sess.Open()
 		return
 	}
 	if sess, ok := any(s.clientSession).(*quic.Connection); ok {
@@ -42,7 +42,7 @@ func (s *Session[T]) OpenStream() (conn net.Conn, err error) {
 	}
 	return
 }
-func (s *Session[T]) Close() {
+func (s *Session) Close() {
 	defer func() {
 		s.chanClose <- true
 	}()
@@ -57,7 +57,7 @@ func (s *Session[T]) Close() {
 		}
 	}
 }
-func (s *Session[T]) Accept(handle SessionHandle) {
+func (s *Session) Accept(handle SessionHandle) {
 	go func() {
 		for {
 			if sess, ok := any(s.serverSession).(*yamux.Session); ok {
