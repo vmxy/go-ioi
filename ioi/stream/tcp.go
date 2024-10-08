@@ -82,6 +82,11 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 				continue
 			}
 			sess.clientSession = client
+			if sess.serverSession == nil {
+				maps.Delete(sid)
+				sess.Close()
+				continue
+			}
 			handle(sess)
 		} else {
 			// Setup server side of yamux

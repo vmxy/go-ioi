@@ -2,6 +2,12 @@ package stream
 
 import "net"
 
+type SessionHandle func(session *Session)
+
+type Accept interface {
+	Listen(host string, port int, handle SessionHandle)
+}
+
 type Listener struct {
 	conn chan net.Conn
 	addr net.Addr
