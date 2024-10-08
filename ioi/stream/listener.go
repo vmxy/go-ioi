@@ -5,6 +5,7 @@ import "net"
 type SessionHandle func(session *Session)
 
 type Accept interface {
+	Connect(host string, port int) (*Session, error)
 	Listen(host string, port int, handle SessionHandle)
 }
 

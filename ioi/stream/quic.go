@@ -15,18 +15,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/quic-go/quic-go"
+	"github.com/vmxy/go-ioi/ioi/util"
 )
 
 type Quic struct {
-	Manager *Manager[*quic.Connection]
 }
 
 func NewQuic() *Quic {
-	m := NewManager[*quic.Connection]()
-	q := &Quic{
-		Manager: &m,
-	}
+	q := &Quic{}
 	return q
 }
 
@@ -66,7 +64,6 @@ func (s *TStream) SetWriteDeadline(t time.Time) error {
 
 var _ = (net.Conn)((*TStream)(nil))
 var _ = (Accept)((*Quic)(nil))
-var _ = (Connect)((*Quic)(nil))
 
 //var _ = (Connect)((*AcceptQuic)(nil))
 
@@ -87,61 +84,66 @@ func (accept *Quic) Listen(host string, port int, handle SessionHandle) {
 		go accept.handleSession(sess, handle)
 	}
 }
-
-func (accept *Quic) Connect(host string, port int) (net.Conn, error) {
+func connectQuic(host string, port int, sid string, connectType ConnectType) (sess quic.Connection, err error) {
 	hp := fmt.Sprintf("%s:%d", host, port)
-	var session *quic.Connection
-	if sess, ok := accept.Manager.Get(hp); ok {
-		session = sess
-	} else {
-		sess, err := quic.DialAddr(context.Background(), hp, generateTLSConfig(), nil)
-		if err != nil {
-			log.Println(err)
-			return nil, err
-		}
-		session = &sess
-		accept.Manager.Set(hp, session)
-	}
-	stream, err := (*session).OpenStream()
+	sess, err = quic.DialAddr(context.Background(), hp, generateTLSConfig(), nil)
+	stream, err := sess.OpenStream()
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
 	conn := &TStream{
 		stream:     &stream,
-		localAddr:  (*session).LocalAddr(),
-		remoteAddr: (*session).RemoteAddr(),
+		localAddr:  sess.LocalAddr(),
+		remoteAddr: sess.RemoteAddr(),
 	}
-	err = connect(conn, "")
+	err = connect(conn, connectType, sid)
 	if err != nil {
 		conn.Close()
 		return nil, err
 	}
-	return conn, nil
+	return sess, err
+}
+func (accept *Quic) Connect(host string, port int) (*Session, error) {
+	sid := uuid.New().String()
+	client, err := connectQuic(host, port, sid, ConnectType_Client)
+	if err != nil {
+		return nil, err
+	}
+	server, err := connectQuic(host, port, sid, ConnectType_Server)
+	if err != nil {
+		return nil, err
+	}
+	sess := NewSession(sid, client, server)
+	return &sess, nil
 }
 
-func (accept *Quic) handleSession(sess quic.Connection, handle SessionHandle) {
-	defer sess.Context().Done()
+func (accept *Quic) handleSession(quicSess quic.Connection, handle SessionHandle) {
+	maps := util.NewMap[string, *Session]()
+	defer func() {
+		maps.Clear()
+		quicSess.Context().Done()
+	}()
 	var bs []byte = make([]byte, 0, 2048)
 	for {
-		stream, err := sess.AcceptStream(context.Background())
+		stream, err := quicSess.AcceptStream(context.Background())
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		var conn net.Conn = &TStream{
 			stream:     &stream,
-			localAddr:  sess.LocalAddr(),
-			remoteAddr: sess.RemoteAddr(),
+			localAddr:  quicSess.LocalAddr(),
+			remoteAddr: quicSess.RemoteAddr(),
 		}
 		size, err := conn.Read(bs)
 		if err != nil {
 			log.Println("read err", err)
 			continue
 		}
-		handshake := bs[0:size]
-		if IsWebSocket(handshake) {
-			conn, err = UpdateWebSocket(handshake, &conn)
+		chunk := bs[0:size]
+		if IsWebSocket(chunk) {
+			conn, err = UpdateWebSocket(chunk, &conn)
 			if err != nil {
 				log.Println("websocket accept error", err)
 				continue
@@ -151,14 +153,32 @@ func (accept *Quic) handleSession(sess quic.Connection, handle SessionHandle) {
 				log.Println("websocket read err", err)
 				continue
 			}
-			handshake = bs[0:size]
+			chunk = bs[0:size]
 		}
-		if !IsVMFS(handshake) {
+		if !IsVMFS(chunk) {
 			conn.Close()
 			continue
 		}
+		_, connectType, sid := parseVMFSRequest(chunk)
+		fmt.Println("id==", sid)
 		conn.Write([]byte("vmfs/1 200 ok\r\n\r\n"))
-		go handle(conn)
+		sess, find := maps.Get(sid)
+		if !find {
+			sess1 := NewSession[*quic.Connection](sid, nil, nil)
+			sess = &sess1
+			maps.Set(sid, &sess1)
+		}
+		if connectType == "server" {
+			maps.Delete(sid)
+			sess.clientSession = quicSess
+			if sess.serverSession == nil {
+				sess.Close()
+				continue
+			}
+			go handle(sess)
+		} else {
+			sess.serverSession = quicSess
+		}
 	}
 }
 

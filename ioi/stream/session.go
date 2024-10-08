@@ -9,13 +9,15 @@ import (
 )
 
 type Session struct {
+	id            string
 	clientSession any
 	serverSession any
 	chanClose     chan bool
 }
 
-func NewSession[T any](client T, server T) Session {
+func NewSession[T any](id string, client T, server T) Session {
 	session := Session{
+		id:            id,
 		clientSession: client,
 		serverSession: server,
 		chanClose:     make(chan bool, 1),
@@ -57,7 +59,11 @@ func (s *Session) Close() {
 		}
 	}
 }
-func (s *Session) Accept(handle SessionHandle) {
+func (s *Session) Listen() (net.Listener, error) {
+	lis := NewListener(&net.TCPAddr{
+		IP:   net.ParseIP("127.0.0.1"),
+		Port: 0,
+	})
 	go func() {
 		for {
 			if sess, ok := any(s.serverSession).(*yamux.Session); ok {
@@ -66,7 +72,8 @@ func (s *Session) Accept(handle SessionHandle) {
 					s.Close()
 					return
 				}
-				handle(conn)
+				lis.conn <- conn
+				//handle(conn)
 			} else if sess, ok := any(s.serverSession).(*quic.Connection); ok {
 				quicCon, err := (*sess).AcceptStream(context.Background())
 				if err != nil {
@@ -77,8 +84,10 @@ func (s *Session) Accept(handle SessionHandle) {
 					localAddr:  (*sess).LocalAddr(),
 					remoteAddr: (*sess).RemoteAddr(),
 				}
-				handle(conn)
+				lis.conn <- conn
+				//handle(conn)
 			}
 		}
 	}()
+	return &lis, nil
 }
