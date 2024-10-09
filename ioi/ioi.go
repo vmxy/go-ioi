@@ -11,20 +11,21 @@ type SessionHandle = stream.SessionHandle
 
 var Log = util.Log
 
+/*
 var (
 	Network_Tcp  Network = "tcp"
 	Network_Quic         = "quic"
-)
+) */
 
 var tcp = stream.NewTcp()
 
-func Listen(host string, port int, handle stream.SessionHandle) {
-	tcp.Listen(host, port, func(session *stream.Session) {
+func Listen(host string, port int, handle SessionHandle) {
+	tcp.Listen(host, port, func(session *Session) {
 		handle(session)
 	})
 }
 
-func Dail(host string, port int) (sess *stream.Session, err error) {
+func Dail(host string, port int) (sess *Session, err error) {
 	sess, err = tcp.Connect(host, port)
 	if err != nil {
 		return
