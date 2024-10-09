@@ -2,9 +2,14 @@ package ioi
 
 import (
 	"github.com/vmxy/go-ioi/ioi/stream"
+	"github.com/vmxy/go-ioi/ioi/util"
 )
 
 type Network = string
+type Session = stream.Session
+type SessionHandle = stream.SessionHandle
+
+var Log = util.Log
 
 var (
 	Network_Tcp  Network = "tcp"

@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/vmxy/go-ioi/ioi"
-	"github.com/vmxy/go-ioi/ioi/stream"
-	"github.com/vmxy/go-ioi/ioi/util"
 )
 
 func main() {
@@ -18,20 +16,20 @@ func main() {
 	args := flag.Args()
 
 	if len(args) < 1 {
-		util.Log.Println("========no args")
+		ioi.Log.Println("========no args")
 		//return
 	}
 
-	util.Log.Println("=====", args)
+	ioi.Log.Println("=====", args)
 	host, port := "127.0.0.1", 9292
 	if args[0] == "server" {
-		ioi.Listen(host, port, func(session *stream.Session) {
-			util.Log.Println("accept==========")
+		ioi.Listen(host, port, func(session *ioi.Session) {
+			ioi.Log.Println("accept==========")
 			go HandleAccept(session)
 			conn, err := session.OpenStream()
 			if err != nil {
 				session.Close()
-				util.Log.Println("open stream error", err)
+				ioi.Log.Println("open stream error", err)
 				return
 			}
 			conn.Write([]byte("server write client --->x1------------"))
@@ -41,7 +39,7 @@ func main() {
 				if err == io.EOF {
 					return
 				}
-				util.Log.Println("read error 1", err)
+				ioi.Log.Println("read error 1", err)
 				session.Close()
 				return
 			}
@@ -78,7 +76,7 @@ func main() {
 			if err == io.EOF {
 				return
 			}
-			util.Log.Println("read error 2")
+			ioi.Log.Println("read error 2")
 			return
 		}
 		fmt.Println("read by client=====>", string(bs[0:size]))
@@ -94,17 +92,17 @@ func ParseInt(v string) int {
 	return int(x)
 }
 
-func HandleAccept(session *stream.Session) {
+func HandleAccept(session *ioi.Session) {
 	defer session.Close()
 	lis, err := session.Listen()
 	if err != nil {
-		util.Log.Println("listen error", lis)
+		ioi.Log.Println("listen error", lis)
 
 	}
 	for {
 		conn, err := lis.Accept()
 		if err != nil {
-			util.Log.Println("listen error", lis)
+			ioi.Log.Println("listen error", lis)
 			break
 		}
 		go func() {
