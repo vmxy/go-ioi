@@ -30,7 +30,6 @@ func parseVMFSRequest(input []byte) (version string, connectType ConnectType, si
 	ps := strings.Split(line, "/")
 	version = ""
 	sid = ""
-	fmt.Println("parseVMFSRequest", line)
 	if len(ps) == 4 {
 		version = ps[1]
 		connectType = ConnectType(ps[2])

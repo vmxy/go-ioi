@@ -81,7 +81,7 @@ func main() {
 			util.Log.Println("read error 2")
 			return
 		}
-		fmt.Println("read by client=====", string(bs[0:size]))
+		fmt.Println("read by client=====>", string(bs[0:size]))
 		conn.Close()
 	}
 
