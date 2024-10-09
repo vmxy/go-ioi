@@ -2,6 +2,7 @@ package stream
 
 import (
 	"context"
+	"io"
 	"net"
 
 	"github.com/hashicorp/yamux"
@@ -69,11 +70,13 @@ func (s *Session) Listen() (net.Listener, error) {
 			if sess, ok := any(s.serverSession).(*yamux.Session); ok {
 				conn, err := sess.AcceptStream()
 				if err != nil {
+					if err == io.EOF {
+						continue
+					}
 					s.Close()
-					return
+					break
 				}
 				lis.conn <- conn
-				//handle(conn)
 			} else if sess, ok := any(s.serverSession).(*quic.Connection); ok {
 				quicCon, err := (*sess).AcceptStream(context.Background())
 				if err != nil {
@@ -85,7 +88,6 @@ func (s *Session) Listen() (net.Listener, error) {
 					remoteAddr: (*sess).RemoteAddr(),
 				}
 				lis.conn <- conn
-				//handle(conn)
 			}
 		}
 	}()

@@ -42,6 +42,7 @@ func parseVMFSRequest(input []byte) (version string, connectType ConnectType, si
 func connect(conn net.Conn, connectType ConnectType, sid string) error {
 	ver := "1"
 	req := fmt.Sprintf("vmfs/%s/%s/%s", ver, connectType, sid)
+	fmt.Println("connect===>", req)
 	conn.Write([]byte(req))
 	bs := make([]byte, 128)
 	size, err := conn.Read(bs)
@@ -60,7 +61,7 @@ func connectClient(server string, sid string) (*yamux.Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = connect(conn, ConnectType_Server, sid)
+	err = connect(conn, ConnectType_Client, sid)
 	if err != nil {
 		return nil, err
 	}

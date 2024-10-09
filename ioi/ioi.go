@@ -14,7 +14,9 @@ var (
 var tcp = stream.NewTcp()
 
 func Listen(host string, port int, handle stream.SessionHandle) {
-	tcp.Listen(host, port, func(session *stream.Session) {})
+	tcp.Listen(host, port, func(session *stream.Session) {
+		handle(session)
+	})
 }
 
 func Dail(host string, port int) (sess *stream.Session, err error) {

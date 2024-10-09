@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -26,6 +27,26 @@ func main() {
 	if args[0] == "server" {
 		ioi.Listen(host, port, func(session *stream.Session) {
 			util.Log.Println("accept==========")
+			go HandleAccept(session)
+			conn, err := session.OpenStream()
+			if err != nil {
+				session.Close()
+				util.Log.Println("open stream error", err)
+				return
+			}
+			conn.Write([]byte("server write client --->x1------------"))
+			bs := make([]byte, 1024)
+			size, err := conn.Read(bs)
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				util.Log.Println("read error 1", err)
+				session.Close()
+				return
+			}
+			fmt.Println("server open stream on read", string(bs[0:size]))
+			conn.Close()
 		})
 	} else if args[0] == "client" {
 		var f flag.FlagSet
@@ -45,11 +66,23 @@ func main() {
 		if err != nil {
 			log.Panicln("dail error", err)
 		}
+		go HandleAccept(session)
 		conn, err := session.OpenStream()
 		if err != nil {
 			log.Panicln("dail error", err)
 		}
-		conn.Write([]byte("request"))
+		conn.Write([]byte("client write server ---> request"))
+		bs := make([]byte, 1024)
+		size, err := conn.Read(bs)
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			util.Log.Println("read error 2")
+			return
+		}
+		fmt.Println("read by client=====", string(bs[0:size]))
+		conn.Close()
 	}
 
 }
@@ -59,4 +92,34 @@ func ParseInt(v string) int {
 		return 0
 	}
 	return int(x)
+}
+
+func HandleAccept(session *stream.Session) {
+	defer session.Close()
+	lis, err := session.Listen()
+	if err != nil {
+		util.Log.Println("listen error", lis)
+
+	}
+	for {
+		conn, err := lis.Accept()
+		if err != nil {
+			util.Log.Println("listen error", lis)
+			break
+		}
+		go func() {
+			bs := make([]byte, 1024)
+			for {
+				size, err := conn.Read(bs)
+				if err != nil {
+					conn.Close()
+					break
+				}
+				fmt.Println("read accept data=", string(bs[0:size]))
+				conn.Write([]byte("response--->" + string(bs[0:size])))
+			}
+		}()
+
+	}
+
 }

@@ -70,9 +70,10 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 		if !find {
 			sess1 := NewSession[*yamux.Session](sid, nil, nil)
 			sess = &sess1
-			maps.Set(sid, &sess1)
+			maps.Set(sid, sess)
 		}
 		if connectType == "server" {
+			fmt.Println("connect client use server")
 			maps.Delete(sid)
 			client, err := yamux.Client(conn, nil)
 			if err != nil {
@@ -80,20 +81,22 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 				continue
 			}
 			sess.clientSession = client
+			fmt.Println("set client", sid)
 			if sess.serverSession == nil {
-
 				sess.Close()
 				continue
 			}
 			handle(sess)
 		} else {
 			// Setup server side of yamux
+			fmt.Println("connect client use client")
 			server, err := yamux.Server(conn, nil)
 			if err != nil {
 				util.Log.Println(err)
 				continue
 			}
 			sess.serverSession = server
+			fmt.Println("set server", sid)
 		}
 	}
 }
