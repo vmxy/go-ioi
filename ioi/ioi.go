@@ -1,6 +1,8 @@
 package ioi
 
-import "github.com/vmxy/go-ioi/ioi/stream"
+import (
+	"github.com/vmxy/go-ioi/ioi/stream"
+)
 
 type Network = string
 

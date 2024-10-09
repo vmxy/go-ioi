@@ -15,7 +15,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/quic-go/quic-go"
 	"github.com/vmxy/go-ioi/ioi/util"
 )
@@ -105,7 +104,7 @@ func connectQuic(host string, port int, sid string, connectType ConnectType) (se
 	return sess, err
 }
 func (accept *Quic) Connect(host string, port int) (*Session, error) {
-	sid := uuid.New().String()
+	sid := util.BuildSN(12)
 	client, err := connectQuic(host, port, sid, ConnectType_Client)
 	if err != nil {
 		return nil, err

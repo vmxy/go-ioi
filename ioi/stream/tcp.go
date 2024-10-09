@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/yamux"
 	"github.com/vmxy/go-ioi/ioi/util"
 )
@@ -100,8 +99,7 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 }
 
 func (accept *Tcp) Connect(host string, port int) (*Session, error) {
-	sid := uuid.New().String()
-
+	sid := util.BuildSN(12)
 	hostport := fmt.Sprintf("%s:%d", host, port)
 	client, err := connectClient(hostport, sid)
 	if err != nil {
