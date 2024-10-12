@@ -25,7 +25,7 @@ func Listen(host string, port int, handle SessionHandle) {
 	})
 }
 
-func Dail(host string, port int) (sess *Session, err error) {
+func Dial(host string, port int) (sess *Session, err error) {
 	sess, err = tcp.Connect(host, port)
 	if err != nil {
 		return
