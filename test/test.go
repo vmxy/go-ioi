@@ -60,7 +60,7 @@ func main() {
 
 		host, port := hp[0], ParseInt(hp[1])
 
-		session, err := ioi.Dail(host, port)
+		session, err := ioi.Dial(host, port)
 		if err != nil {
 			log.Panicln("dail error", err)
 		}

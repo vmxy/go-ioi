@@ -19,10 +19,9 @@ var (
 	ConnectType_Server ConnectType = "server"
 )
 
-// vmfs/1
 func IsVMFS(input []byte) bool {
 	str := util.String(input[:6])
-	return str.Match(`^vmfs\/[0-9]+`)
+	return str.Match(`^ioi\/[0-9]+`)
 }
 
 func parseVMFSRequest(input []byte) (version string, connectType ConnectType, sid string) {
@@ -40,8 +39,7 @@ func parseVMFSRequest(input []byte) (version string, connectType ConnectType, si
 
 func connect(conn net.Conn, connectType ConnectType, sid string) error {
 	ver := "1"
-	req := fmt.Sprintf("vmfs/%s/%s/%s", ver, connectType, sid)
-	fmt.Println("connect===>", req)
+	req := fmt.Sprintf("ioi/%s/%s/%s", ver, connectType, sid)
 	conn.Write([]byte(req))
 	bs := make([]byte, 128)
 	size, err := conn.Read(bs)
@@ -49,7 +47,7 @@ func connect(conn net.Conn, connectType ConnectType, sid string) error {
 		return err
 	}
 	res := util.String(bs[0:size])
-	if !res.Match(`(?i)^vmfs/\d+ 200`) {
+	if !res.Match(`(?i)^ioi/\d+ 200`) {
 		return errors.New("connect scheme error " + res.String())
 	}
 	return nil

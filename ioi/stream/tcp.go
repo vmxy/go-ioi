@@ -63,7 +63,7 @@ func (accept *Tcp) Listen(host string, port int, handle SessionHandle) {
 			continue
 		}
 		_, connectType, sid := parseVMFSRequest(chunk)
-		conn.Write([]byte("vmfs/1 200 ok\r\n\r\n"))
+		conn.Write([]byte("ioi/1 200 ok\r\n\r\n"))
 		sess, find := maps.Get(sid)
 		if !find {
 			sess1 := NewSession[*yamux.Session](sid, nil, nil)
